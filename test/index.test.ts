@@ -1,0 +1,57 @@
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { execSync } from 'node:child_process'
+
+const ROOT = join(import.meta.dirname, '..')
+const TMP = join(ROOT, '.test-tmp')
+const TEMPLATE = join(TMP, 'template')
+const OUTPUT = join(TMP, 'output')
+
+beforeAll(() => {
+  rmSync(TMP, { recursive: true, force: true })
+  mkdirSync(TEMPLATE, { recursive: true })
+  mkdirSync(OUTPUT, { recursive: true })
+  mkdirSync(join(TEMPLATE, '.scaffold'), { recursive: true })
+
+  writeFileSync(join(TEMPLATE, 'index.js'), 'console.log("hello")')
+  writeFileSync(join(TEMPLATE, 'package.json'), '{"name": "test"}')
+  writeFileSync(join(TEMPLATE, '.scaffold', 'config.json'), JSON.stringify({
+    name: 'test-template',
+    ignore: ['*.log']
+  }))
+  writeFileSync(join(TEMPLATE, 'debug.log'), 'should be ignored')
+})
+
+afterAll(() => {
+  rmSync(TMP, { recursive: true, force: true })
+})
+
+describe('scaffold', () => {
+  test('scaffolds from local path', () => {
+    execSync(`bun run ${ROOT}/src/index.ts test-project --from ${TEMPLATE} -y`, {
+      cwd: OUTPUT,
+    })
+
+    expect(existsSync(join(OUTPUT, 'test-project'))).toBe(true)
+    expect(existsSync(join(OUTPUT, 'test-project/index.js'))).toBe(true)
+    expect(existsSync(join(OUTPUT, 'test-project/package.json'))).toBe(true)
+  })
+
+  test('ignores files from config', () => {
+    expect(existsSync(join(OUTPUT, 'test-project/debug.log'))).toBe(false)
+  })
+
+  test('excludes .scaffold folder', () => {
+    expect(existsSync(join(OUTPUT, 'test-project/.scaffold'))).toBe(false)
+  })
+
+  test('rejects existing directory', () => {
+    expect(() => {
+      execSync(`bun run ${ROOT}/src/index.ts test-project --from ${TEMPLATE} -y`, {
+        cwd: OUTPUT,
+        stdio: 'pipe',
+      })
+    }).toThrow()
+  })
+})

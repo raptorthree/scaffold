@@ -1,7 +1,7 @@
 {
   "name": "@raptorthree/scaffold",
   "version": "0.0.1",
-  "description": "Scaffold projects from curated stacks",
+  "description": "Scaffold projects from any git repo or local template",
   "type": "module",
   "bin": {
     "scaffold": "./dist/index.js",
@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun run tsup src/index.ts --format esm --dts --clean",
+    "test": "bun test",
     "prepublishOnly": "bun run build"
   },
   "keywords": [
