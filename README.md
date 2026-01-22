@@ -53,9 +53,16 @@ Any repo works. Add `.scaffold/` for extras:
 my-template/
 ├── .scaffold/
 │   ├── config.json
-│   └── post-install.sh
+│   ├── pre-install.sh   # runs before copying (optional)
+│   └── post-install.sh  # runs after copying (optional)
 └── ...
 ```
+
+**Execution order:**
+1. `pre-install.sh` - before files copied (check requirements)
+2. Files copied to target
+3. Prompts run (if defined in config.json)
+4. `post-install.sh` - after copying, with prompt answers
 
 ### config.json
 
@@ -63,26 +70,57 @@ my-template/
 {
   "name": "my-stack",
   "description": "What it is",
-  "ignore": ["node_modules", "tmp", "*.lock"]
+  "ignore": ["node_modules", "tmp", "*.lock"],
+  "prompts": [
+    {
+      "name": "db",
+      "type": "select",
+      "message": "Database?",
+      "options": ["sqlite", "postgresql", "mysql"],
+      "initialValue": "sqlite"
+    }
+  ]
 }
 ```
+
+### Prompt Types
+
+```json
+// Text input
+{ "name": "app_name", "type": "text", "message": "App name?", "initialValue": "my-app" }
+
+// Select one
+{ "name": "db", "type": "select", "message": "Database?", "options": ["sqlite", "pg"], "initialValue": "sqlite" }
+
+// Yes/No
+{ "name": "typescript", "type": "confirm", "message": "TypeScript?", "initialValue": true }
+
+// Select multiple
+{ "name": "features", "type": "multiselect", "message": "Features?", "options": ["auth", "api"], "initialValue": ["auth"] }
+```
+
+Options can be strings or objects: `{ "value": "pg", "label": "PostgreSQL", "hint": "Recommended" }`
 
 ### post-install.sh
 
 ```sh
 #!/bin/sh
 
-# Check for non-interactive mode (scaffold -y)
+# Prompt answers available as env vars
+echo "Using database: $SCAFFOLD_DB"
+
+# Check for non-interactive mode
 if [ "$SCAFFOLD_NON_INTERACTIVE" = "1" ]; then
-  echo "Running in non-interactive mode..."
+  echo "Running in CI mode..."
 fi
 
 bun install
 ```
 
-**Environment variables available:**
+**Environment variables:**
 - `SCAFFOLD_TARGET` - path to scaffolded project
-- `SCAFFOLD_NON_INTERACTIVE` - "1" if `-y` flag was used (scripts must not prompt)
+- `SCAFFOLD_NON_INTERACTIVE` - "1" if `-y` flag used
+- `SCAFFOLD_<NAME>` - prompt answers (uppercase)
 
 ## Development
 
