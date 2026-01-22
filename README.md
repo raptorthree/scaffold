@@ -40,9 +40,6 @@ scaffold my-app --from bitbucket:user/repo
 
 # From local path
 scaffold my-app --from ./my-template
-
-# Skip prompts
-scaffold my-app --from ./template -y
 ```
 
 ## Creating a Template

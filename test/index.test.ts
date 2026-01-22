@@ -29,7 +29,7 @@ afterAll(() => {
 
 describe('scaffold', () => {
   test('scaffolds from local path', () => {
-    execSync(`bun run ${ROOT}/src/index.ts test-project --from ${TEMPLATE} -y`, {
+    execSync(`bun run ${ROOT}/src/index.ts test-project --from ${TEMPLATE}`, {
       cwd: OUTPUT,
     })
 
@@ -48,7 +48,7 @@ describe('scaffold', () => {
 
   test('rejects existing directory', () => {
     expect(() => {
-      execSync(`bun run ${ROOT}/src/index.ts test-project --from ${TEMPLATE} -y`, {
+      execSync(`bun run ${ROOT}/src/index.ts test-project --from ${TEMPLATE}`, {
         cwd: OUTPUT,
         stdio: 'pipe',
       })

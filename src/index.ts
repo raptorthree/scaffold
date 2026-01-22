@@ -70,15 +70,8 @@ function shouldIgnore(path: string, patterns: string[]): boolean {
   })
 }
 
-async function runPostInstall(hookPath: string, targetDir: string, auto: boolean): Promise<void> {
+function runPostInstall(hookPath: string, targetDir: string): void {
   if (!existsSync(hookPath)) return
-
-  const run = auto || onCancel(await p.confirm({
-    message: 'Run post-install script?',
-    initialValue: true,
-  }))
-
-  if (!run) return
 
   const s = p.spinner()
   s.start('Running post-install...')
@@ -110,11 +103,6 @@ const main = defineCommand({
       type: 'string',
       alias: 'f',
       description: 'Repo (user/repo, gitlab:user/repo) or local path',
-    },
-    yes: {
-      type: 'boolean',
-      alias: 'y',
-      description: 'Skip confirmations',
     },
   },
   async run({ args }) {
@@ -185,7 +173,7 @@ const main = defineCommand({
       s.stop(`Scaffolded ${pc.cyan(projectName)}`)
 
       if (postInstallPath) {
-        await runPostInstall(postInstallPath, targetDir, args.yes ?? false)
+        runPostInstall(postInstallPath, targetDir)
         if (!isLocal) rmSync(postInstallPath, { force: true })
       }
 
