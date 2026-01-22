@@ -40,6 +40,9 @@ scaffold my-app --from bitbucket:user/repo
 
 # From local path
 scaffold my-app --from ./my-template
+
+# Non-interactive (for CI/AI)
+scaffold my-app --from user/repo -y
 ```
 
 ## Creating a Template
@@ -68,8 +71,18 @@ my-template/
 
 ```sh
 #!/bin/sh
+
+# Check for non-interactive mode (scaffold -y)
+if [ "$SCAFFOLD_NON_INTERACTIVE" = "1" ]; then
+  echo "Running in non-interactive mode..."
+fi
+
 bun install
 ```
+
+**Environment variables available:**
+- `SCAFFOLD_TARGET` - path to scaffolded project
+- `SCAFFOLD_NON_INTERACTIVE` - "1" if `-y` flag was used (scripts must not prompt)
 
 ## Development
 

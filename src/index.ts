@@ -70,7 +70,7 @@ function shouldIgnore(path: string, patterns: string[]): boolean {
   })
 }
 
-function runPostInstall(hookPath: string, targetDir: string): void {
+function runPostInstall(hookPath: string, targetDir: string, nonInteractive: boolean): void {
   if (!existsSync(hookPath)) return
 
   const s = p.spinner()
@@ -79,7 +79,11 @@ function runPostInstall(hookPath: string, targetDir: string): void {
     execSync(`sh "${hookPath}"`, {
       cwd: targetDir,
       stdio: 'inherit',
-      env: { ...process.env, SCAFFOLD_TARGET: targetDir }
+      env: {
+        ...process.env,
+        SCAFFOLD_TARGET: targetDir,
+        SCAFFOLD_NON_INTERACTIVE: nonInteractive ? '1' : '',
+      }
     })
     s.stop('Post-install complete')
   } catch {
@@ -103,6 +107,11 @@ const main = defineCommand({
       type: 'string',
       alias: 'f',
       description: 'Repo (user/repo, gitlab:user/repo) or local path',
+    },
+    yes: {
+      type: 'boolean',
+      alias: 'y',
+      description: 'Non-interactive mode (scripts must use defaults)',
     },
   },
   async run({ args }) {
@@ -173,7 +182,7 @@ const main = defineCommand({
       s.stop(`Scaffolded ${pc.cyan(projectName)}`)
 
       if (postInstallPath) {
-        runPostInstall(postInstallPath, targetDir)
+        runPostInstall(postInstallPath, targetDir, args.yes ?? false)
         if (!isLocal) rmSync(postInstallPath, { force: true })
       }
 
