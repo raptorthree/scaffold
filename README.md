@@ -4,20 +4,29 @@ Scaffold projects from any git repo or local template.
 
 > **npm publish coming soon.** For now, use locally.
 
-## Local Usage
+## Local Setup
 
 ```bash
-# Clone and install
 git clone https://github.com/raptorthree/scaffold.git
 cd scaffold
 bun install
-bun link
+bun run build
 
-# Now use from anywhere
+# Add to PATH (run once)
+ln -s $(pwd)/dist/index.js ~/.bun/bin/scaffold
+chmod +x ~/.bun/bin/scaffold
+
+# Make sure ~/.bun/bin is in your PATH
+# Add to ~/.zshrc if not: export PATH="$HOME/.bun/bin:$PATH"
+```
+
+Now use from anywhere:
+
+```bash
 scaffold my-app --from user/repo
 ```
 
-## Examples
+## Usage
 
 ```bash
 # From GitHub (default)
@@ -36,7 +45,7 @@ scaffold my-app --from ./my-template
 scaffold my-app --from ./template -y
 ```
 
-## Creating a Stack
+## Creating a Template
 
 Any repo works. Add `.scaffold/` for extras:
 
@@ -69,9 +78,9 @@ bun install
 
 ```bash
 bun install
-bun run dev
-bun run build
-bun test
+bun run dev      # run directly
+bun run build    # build dist
+bun test         # run tests
 ```
 
 ## License
