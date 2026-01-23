@@ -101,6 +101,8 @@ my-template/
 
 Options can be strings or objects: `{ "value": "pg", "label": "PostgreSQL", "hint": "Recommended" }`
 
+> **Note:** Prompt format follows [@clack/prompts](https://www.clack.cc/) conventions. See their [docs](https://github.com/bombshell-dev/clack/tree/main/packages/prompts) for full options.
+
 ### post-install.sh
 
 ```sh

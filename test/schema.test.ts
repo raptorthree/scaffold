@@ -23,10 +23,24 @@ describe('ScaffoldConfig schema', () => {
         name: 'app_name',
         type: 'text',
         message: 'App name?',
+        placeholder: 'my-app',
         initialValue: 'my-app'
       }]
     })
     expect(result.prompts?.[0].type).toBe('text')
+  })
+
+  test('accepts password prompt without initialValue', () => {
+    const result = ScaffoldConfig.parse({
+      prompts: [{
+        name: 'secret',
+        type: 'password',
+        message: 'API key?',
+        mask: '*'
+      }]
+    })
+    expect(result.prompts?.[0].type).toBe('password')
+    expect((result.prompts?.[0] as any).initialValue).toBeUndefined()
   })
 
   test('accepts select prompt with string options', () => {
@@ -36,7 +50,8 @@ describe('ScaffoldConfig schema', () => {
         type: 'select',
         message: 'UI?',
         options: ['tailwind', 'bootstrap'],
-        initialValue: 'tailwind'
+        initialValue: 'tailwind',
+        maxItems: 5
       }]
     })
     expect(result.prompts?.[0].type).toBe('select')
@@ -49,7 +64,7 @@ describe('ScaffoldConfig schema', () => {
         type: 'select',
         message: 'UI?',
         options: [
-          { value: 'tailwind', label: 'Tailwind CSS' },
+          { value: 'tailwind', label: 'Tailwind CSS', hint: 'Recommended' },
           { value: 'none', label: 'None' }
         ]
       }]
@@ -57,26 +72,30 @@ describe('ScaffoldConfig schema', () => {
     expect(result.prompts).toHaveLength(1)
   })
 
-  test('accepts confirm prompt', () => {
+  test('accepts confirm prompt with active/inactive', () => {
     const result = ScaffoldConfig.parse({
       prompts: [{
         name: 'typescript',
         type: 'confirm',
         message: 'Use TypeScript?',
+        active: 'Yes',
+        inactive: 'No',
         initialValue: true
       }]
     })
     expect(result.prompts?.[0].type).toBe('confirm')
   })
 
-  test('accepts multiselect prompt', () => {
+  test('accepts multiselect prompt with all options', () => {
     const result = ScaffoldConfig.parse({
       prompts: [{
         name: 'features',
         type: 'multiselect',
         message: 'Features?',
         options: ['auth', 'api', 'admin'],
-        initialValue: ['auth']
+        initialValue: ['auth'],
+        maxItems: 10,
+        required: true
       }]
     })
     expect(result.prompts?.[0].type).toBe('multiselect')
@@ -85,7 +104,7 @@ describe('ScaffoldConfig schema', () => {
   test('rejects invalid prompt name', () => {
     expect(() => ScaffoldConfig.parse({
       prompts: [{
-        name: 'my-app', // invalid: has dash
+        name: 'my-app',
         type: 'text',
         message: 'Name?'
       }]
@@ -111,5 +130,54 @@ describe('ScaffoldConfig schema', () => {
         options: []
       }]
     })).toThrow()
+  })
+
+  test('rejects select initialValue not in options', () => {
+    expect(() => ScaffoldConfig.parse({
+      prompts: [{
+        name: 'db',
+        type: 'select',
+        message: 'DB?',
+        options: ['sqlite', 'postgres'],
+        initialValue: 'mysql'
+      }]
+    })).toThrow(/initialValue must match/)
+  })
+
+  test('rejects multiselect initialValue not in options', () => {
+    expect(() => ScaffoldConfig.parse({
+      prompts: [{
+        name: 'features',
+        type: 'multiselect',
+        message: 'Features?',
+        options: ['auth', 'api'],
+        initialValue: ['auth', 'admin']
+      }]
+    })).toThrow(/initialValue items must match/)
+  })
+
+  test('rejects duplicate prompt names', () => {
+    expect(() => ScaffoldConfig.parse({
+      prompts: [
+        { name: 'db', type: 'text', message: 'DB?' },
+        { name: 'db', type: 'text', message: 'Database?' }
+      ]
+    })).toThrow(/unique/)
+  })
+
+  test('accepts select initialValue matching object option value', () => {
+    const result = ScaffoldConfig.parse({
+      prompts: [{
+        name: 'db',
+        type: 'select',
+        message: 'DB?',
+        options: [
+          { value: 'pg', label: 'PostgreSQL' },
+          { value: 'mysql', label: 'MySQL' }
+        ],
+        initialValue: 'pg'
+      }]
+    })
+    expect(result.prompts?.[0].type).toBe('select')
   })
 })

@@ -13,12 +13,15 @@ beforeAll(() => {
   mkdirSync(TEMPLATE, { recursive: true })
   mkdirSync(OUTPUT, { recursive: true })
   mkdirSync(join(TEMPLATE, '.scaffold'), { recursive: true })
+  mkdirSync(join(TEMPLATE, 'tmp'), { recursive: true })
 
   writeFileSync(join(TEMPLATE, 'index.js'), 'console.log("hello")')
   writeFileSync(join(TEMPLATE, 'package.json'), '{"name": "test"}')
+  writeFileSync(join(TEMPLATE, 'temperature.txt'), 'should NOT be ignored')
+  writeFileSync(join(TEMPLATE, 'tmp', 'cache.txt'), 'should be ignored')
   writeFileSync(join(TEMPLATE, '.scaffold', 'config.json'), JSON.stringify({
     name: 'test-template',
-    ignore: ['*.log']
+    ignore: ['*.log', 'tmp']
   }))
   writeFileSync(join(TEMPLATE, 'debug.log'), 'should be ignored')
 })
@@ -44,6 +47,15 @@ describe('scaffold', () => {
 
   test('excludes .scaffold folder', () => {
     expect(existsSync(join(OUTPUT, 'test-project/.scaffold'))).toBe(false)
+  })
+
+  test('ignores directory by name', () => {
+    expect(existsSync(join(OUTPUT, 'test-project/tmp'))).toBe(false)
+  })
+
+  test('does not ignore partial name matches', () => {
+    // "tmp" pattern should not match "temperature.txt"
+    expect(existsSync(join(OUTPUT, 'test-project/temperature.txt'))).toBe(true)
   })
 
   test('rejects existing directory', () => {

@@ -17,7 +17,7 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8')
 
 const DEFAULT_IGNORE = ['.git', 'node_modules', '.DS_Store', '.scaffold']
 
-function cancel(msg = 'Cancelled'): never {
+export function cancel(msg = 'Cancelled'): never {
   p.cancel(msg)
   process.exit(0)
 }
@@ -48,6 +48,19 @@ function expandPath(source: string): string {
   return resolve(process.cwd(), source)
 }
 
+interface ZodLikeError extends Error {
+  issues: Array<{ path: (string | number)[]; message: string }>
+}
+
+function isZodError(err: unknown): err is ZodLikeError {
+  return err instanceof Error && 'issues' in err && Array.isArray((err as ZodLikeError).issues)
+}
+
+function formatZodIssue(issue: { path: (string | number)[]; message: string }): string {
+  const prefix = issue.path.length ? `${issue.path.join('.')}: ` : ''
+  return prefix + issue.message
+}
+
 function loadConfig(templatePath: string): ScaffoldConfig {
   const configPath = join(templatePath, '.scaffold', 'config.json')
   if (!existsSync(configPath)) return {}
@@ -56,35 +69,49 @@ function loadConfig(templatePath: string): ScaffoldConfig {
     const raw = JSON.parse(readFileSync(configPath, 'utf-8'))
     return ScaffoldConfig.parse(raw)
   } catch (err) {
-    if (err instanceof Error && err.message.includes('JSON')) {
+    if (err instanceof SyntaxError) {
       throw new Error(`Invalid JSON in .scaffold/config.json`)
+    }
+    if (isZodError(err)) {
+      const msg = err.issues.map(formatZodIssue).join(', ')
+      throw new Error(`Invalid config: ${msg}`)
     }
     throw err
   }
 }
 
-function shouldIgnore(path: string, patterns: string[]): boolean {
-  const name = basename(path)
+function shouldIgnore(relativePath: string, patterns: string[]): boolean {
+  const segments = relativePath.split('/').filter(Boolean)
+  const name = basename(relativePath)
+
   return patterns.some(pattern => {
-    if (pattern.startsWith('*.')) return name.endsWith(pattern.slice(1))
-    return path.includes(pattern)
+    // Extension pattern: *.log
+    if (pattern.startsWith('*.')) {
+      return name.endsWith(pattern.slice(1))
+    }
+    // Exact segment match: node_modules, .git, tmp
+    return segments.includes(pattern)
   })
 }
 
-function runScript(hookPath: string, cwd: string, env: Record<string, string>, label: string): void {
-  if (!existsSync(hookPath)) return
+function copyHookToTemp(src: string, label: string): string | undefined {
+  if (!existsSync(src)) return undefined
+  const dest = join(tmpdir(), `scaffold-${label}-${Date.now()}.sh`)
+  cpSync(src, dest)
+  return dest
+}
 
-  const s = p.spinner()
-  s.start(`Running ${label}...`)
+function runScript(hookPath: string, cwd: string, env: Record<string, string>, label: string): void {
   try {
     execSync(`sh "${hookPath}"`, {
       cwd,
       stdio: 'inherit',
       env: { ...process.env, ...env }
     })
-    s.stop(`${label} complete`)
-  } catch {
-    s.stop(`${label} failed`)
+    p.log.success(`${label} complete`)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown error'
+    throw new Error(`${label} failed: ${msg}`)
   }
 }
 
@@ -149,10 +176,11 @@ const main = defineCommand({
     const isLocal = isLocalPath(source)
     s.start(`Scaffolding ${isLocal ? pc.dim('(local) ') : ''}${pc.cyan(source)}`)
 
+    let preInstallPath: string | undefined
+    let postInstallPath: string | undefined
+
     try {
       let templatePath: string
-      let preInstallPath: string | undefined
-      let postInstallPath: string | undefined
 
       if (isLocal) {
         templatePath = expandPath(source)
@@ -164,17 +192,9 @@ const main = defineCommand({
         await downloadTemplate(toGigetSource(source), { dir: tempDir, forceClean: true })
         templatePath = tempDir
 
-        // Copy hooks before cleanup
-        const srcPre = join(tempDir, '.scaffold', 'pre-install.sh')
-        const srcPost = join(tempDir, '.scaffold', 'post-install.sh')
-        if (existsSync(srcPre)) {
-          preInstallPath = join(tmpdir(), `scaffold-pre-${Date.now()}.sh`)
-          cpSync(srcPre, preInstallPath)
-        }
-        if (existsSync(srcPost)) {
-          postInstallPath = join(tmpdir(), `scaffold-post-${Date.now()}.sh`)
-          cpSync(srcPost, postInstallPath)
-        }
+        // Copy hooks before .scaffold is removed
+        preInstallPath = copyHookToTemp(join(tempDir, '.scaffold', 'pre-install.sh'), 'pre')
+        postInstallPath = copyHookToTemp(join(tempDir, '.scaffold', 'post-install.sh'), 'post')
       }
 
       const config = loadConfig(templatePath)
@@ -186,10 +206,13 @@ const main = defineCommand({
       }
 
       // Run pre-install (before copying)
-      if (preInstallPath) {
-        s.stop('Running pre-install...')
+      if (preInstallPath && existsSync(preInstallPath)) {
+        s.stop('Pre-install')
         runScript(preInstallPath, templatePath, baseEnv, 'pre-install')
-        if (!isLocal) rmSync(preInstallPath, { force: true })
+        if (!isLocal) {
+          rmSync(preInstallPath, { force: true })
+          preInstallPath = undefined
+        }
         s.start('Copying files...')
       }
 
@@ -209,15 +232,21 @@ const main = defineCommand({
       }
 
       // Run post-install (after copying, with prompt answers)
-      if (postInstallPath) {
+      if (postInstallPath && existsSync(postInstallPath)) {
         runScript(postInstallPath, targetDir, { ...baseEnv, ...promptEnv }, 'post-install')
-        if (!isLocal) rmSync(postInstallPath, { force: true })
+        if (!isLocal) {
+          rmSync(postInstallPath, { force: true })
+          postInstallPath = undefined
+        }
       }
 
       p.note(`cd ${projectName}`, 'Next')
       p.outro(pc.green('Done!'))
     } catch (err) {
       s.stop('Failed')
+      // Cleanup temp hooks on error
+      if (preInstallPath && !isLocal) rmSync(preInstallPath, { force: true })
+      if (postInstallPath && !isLocal) rmSync(postInstallPath, { force: true })
       fail(err instanceof Error ? err.message : 'Unknown error')
     }
   },
